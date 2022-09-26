@@ -1,6 +1,15 @@
-module.exports = class TODB {
+import fs from 'fs';
+
+// __dirname is undefined while using es 6 style js
+// fixing it using path
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default class TODB {
     constructor(databaseOptions) {
-        this.fs = require('fs');
+        this.fs = fs;
         this.database = databaseOptions.database;
         this.collection = databaseOptions.collection;
     }

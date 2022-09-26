@@ -1,4 +1,4 @@
-const TODB = require('./db/db.js');
+import TODB from './db/db.js';
 
 const init = async () => {
     const dbOptions = {
