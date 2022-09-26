@@ -14,7 +14,7 @@ export default class TODB {
         this.collection = databaseOptions.collection;
     }
 
-    read() {
+    #read() {
         let startTime = Date.now();
         return new Promise((resolve, reject) => {
             const filename = __dirname + `/${this.database}/${this.collection}.json`;
@@ -93,7 +93,7 @@ export default class TODB {
 
             //read collection
             try {
-                collectionData = await this.read();
+                collectionData = await this.#read();
             } catch (error) {
                 if (error.errorCode === 'DB NOT FOUND') {
                     console.error(error.errorReason);
@@ -127,6 +127,27 @@ export default class TODB {
         })
     }
 
+    async findOne(query){
+        try {
+            const {default: deepCompare} = await import('./deepCompare.js');
+            const collectionData = await this.#read();
+            const found = await collectionData.find(doc=>{
+                return deepCompare(doc, query);
+            })
+            return found;
+        } catch (error) {
+            console.error(error, 'error inside findOne fn')
+        }
+
+    }
+
+    findAll(){
+
+    }
+
+
+
+    // helpers
     isJsonString(str) {
         try {
             JSON.parse(str);

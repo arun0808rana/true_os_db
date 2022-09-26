@@ -17,6 +17,11 @@ const init = async () => {
     } catch (error) {
         console.error(error)
     }
+    const document = await notes.findOne({
+        hello4: "kitty4"
+    });
+    console.log('document', document)
+
 }
 
 init();
