@@ -1,4 +1,4 @@
-class TODB {
+module.exports = class TODB {
     constructor(databaseOptions) {
         this.fs = require('fs');
         this.database = databaseOptions.database;
@@ -84,15 +84,3 @@ class TODB {
         return true;
     }
 }
-
-const init = async () => {
-    const dbOptions = {
-        database: 'arun',
-        collection: 'notes'
-    }
-
-    const x = new TODB(dbOptions);
-    const writtenData = await x.write({ hello: 'kitty' });
-}
-
-init();

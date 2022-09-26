@@ -1,15 +1,13 @@
-const express = require('express')
-const app = express()
-//const cors = require('cors')
-//require('dotenv').config()
-const PORT = 7474;
+const TODB = require('./db/db.js');
 
-//app.use(cors())
+const init = async () => {
+    const dbOptions = {
+        database: 'arun',
+        collection: 'notes'
+    }
 
-app.get('/', (req, res) => {
-    res.send('Hello World!')
-})
+    const x = new TODB(dbOptions);
+    const writtenData = await x.write({ hello: 'kitty' });
+}
 
-app.listen(PORT, () => {
-    console.log(`http://localhost:PORT`)
-})
+init();
