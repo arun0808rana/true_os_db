@@ -2,24 +2,45 @@ module.exports = class TODB {
     constructor(databaseOptions) {
         this.fs = require('fs');
         this.database = databaseOptions.database;
-        this.collection = __dirname + `/${databaseOptions.database}/${databaseOptions.collection}.json`;
-
-        // make db if not exists
-        if (!this.fs.existsSync(__dirname + '/' + this.database)) {
-            this.fs.mkdirSync(__dirname + '/' + this.database);
-        }
+        this.collection = databaseOptions.collection;
     }
 
     read() {
         let startTime = Date.now();
         return new Promise((resolve, reject) => {
+            const filename = __dirname + `/${this.database}/${this.collection}.json`;
             let chunks = [];
-            const readStream = this.fs.createReadStream(this.collection);
+            const readStream = this.fs.createReadStream(filename);
+            let error;
 
             // Handle any errors while reading
             readStream.on('error', err => {
-                console.log('Error while Reading')
-                reject(err)
+                // database not found
+                if (!this.fs.existsSync(__dirname + '/' + this.database)) {
+                    const errorReason = `[ERROR]: Database with the name ${this.database} does not exists.`;
+                    error = {
+                        error: true,
+                        errorReason,
+                        errorCode: 'DB NOT FOUND',
+                        err,
+                    }
+                } else if (!this.fs.existsSync(filename)) {
+                    // collection not found
+                    const errorReason = `[ERROR]: Collection with the name ${this.collection} does not exists.`;
+                    error = {
+                        error: true,
+                        errorReason,
+                        errorCode: 'COLLECTION NOT FOUND',
+                        err,
+                    }
+                } else {
+                    // something else happened
+                    error = {
+                        error: true,
+                        errorReason: err.message,
+                        err,
+                    }
+                }
             });
 
             // Listen for data
@@ -29,15 +50,20 @@ module.exports = class TODB {
 
             // File is done being read
             readStream.on('close', () => {
-                let data;
-                if (chunks.length > 0) {
-                    data = JSON.parse(Buffer.concat(chunks).toString());
+                if (error) {
+                    // console.error(error.errorReason);
+                    reject(error);
                 } else {
-                    data = [];
+                    let data;
+                    if (chunks.length > 0) {
+                        data = JSON.parse(Buffer.concat(chunks).toString());
+                    } else {
+                        data = [];
+                    }
+                    let endTime = Date.now();
+                    console.log('[READ]: Document read in', (endTime - startTime), 'ms.');
+                    resolve(data);
                 }
-                let endTime = Date.now();
-                console.log('Read document in', (endTime - startTime), 'ms.');
-                resolve(data);
             });
         })
     }
@@ -45,17 +71,34 @@ module.exports = class TODB {
     // `let writer = this.fs.createWriteStream(this.collection);` needs to be only after `await this.read()`
     //  else some weird happens and there is no data chunks on data event inside read function
     async write(doc) {
+        let startTime = Date.now();
         return new Promise(async (resolve, reject) => {
-            let startTime = Date.now();
+            const filename = __dirname + `/${this.database}/${this.collection}.json`;
+
+            // checking if doc is object or string
             if (this.isJsonString(doc)) {
                 doc = JSON.parse(doc);
             }
 
+            let collectionData = [];
+
             //read collection
-            let collectionData = await this.read();
+            try {
+                collectionData = await this.read();
+            } catch (error) {
+                if (error.errorCode === 'DB NOT FOUND') {
+                    console.error(error.errorReason);
+                    console.warn(`[WARNING]: Creating database ${this.database} and collection ${this.collection}.`)
+                    // make db if not exists
+                    this.fs.mkdirSync(__dirname + '/' + this.database);
+                } else if (error.errorCode === 'COLLECTION NOT FOUND') {
+                    console.error(error.errorReason);
+                    console.warn(`[WARNING]: Creating collection ${this.collection}.`)
+                }
+            }
 
             // create stream
-            let writeStream = this.fs.createWriteStream(this.collection);
+            let writeStream = this.fs.createWriteStream(filename);
 
             // append doc to collection's array
             collectionData.push(doc);
@@ -66,7 +109,7 @@ module.exports = class TODB {
 
             writeStream.on('finish', () => {
                 let endTime = Date.now();
-                console.log('Wrote document in', (endTime - startTime), 'ms.');
+                console.log('[WRITE]: Document written in', (endTime - startTime), 'ms.');
                 resolve(collectionData);
             });
             writeStream.on('error', reject);

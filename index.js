@@ -6,8 +6,17 @@ const init = async () => {
         collection: 'notes'
     }
 
-    const x = new TODB(dbOptions);
-    const writtenData = await x.write({ hello: 'kitty' });
+    // making a new document
+    const notes = new TODB(dbOptions);
+
+    try {
+        // writing to the document
+        const writtenData = await notes.write({ hello: "kitty" });
+        // write function returns the data of the document
+        console.log("writtenData", writtenData);
+    } catch (error) {
+        console.error(error)
+    }
 }
 
 init();
