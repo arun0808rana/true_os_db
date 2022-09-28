@@ -17,9 +17,10 @@ export default class TODB {
     #read() {
         let startTime = Date.now();
         return new Promise((resolve, reject) => {
-            const filename = __dirname + `/${this.database}/${this.collection}.json`;
-            let chunks = [];
-            const readStream = this.fs.createReadStream(filename);
+            const filename = __dirname + `/${this.database}/${this.collection}.txt`;
+            let lines = [];
+            let chunks = '';
+            const readStream = this.fs.createReadStream(filename, { encoding: 'utf-8' });
             let error;
 
             // Handle any errors while reading
@@ -54,20 +55,26 @@ export default class TODB {
 
             // Listen for data
             readStream.on('data', chunk => {
-                chunks.push(chunk);
+                console.log('chunk', chunk);
+                for (let char of chunk) {
+                    chunks += char;
+                    if (char === '\n') {
+                        lines.push(chunks);
+                        chunks = ''
+                    }
+                }
             });
 
             // File is done being read
             readStream.on('close', () => {
+                console.log('lines', lines)
                 if (error) {
                     // console.error(error.errorReason);
                     reject(error);
                 } else {
-                    let data;
-                    if (chunks.length > 0) {
-                        data = JSON.parse(Buffer.concat(chunks).toString());
-                    } else {
-                        data = [];
+                    let data = '';
+                    if (lines.length > 0) {
+                        data = lines.join('');
                     }
                     let endTime = Date.now();
                     console.log('[READ]: Document read in', (endTime - startTime), 'ms.');
@@ -79,21 +86,22 @@ export default class TODB {
 
     // `let writer = this.fs.createWriteStream(this.collection);` needs to be only after `await this.read()`
     //  else some weird happens and there is no data chunks on data event inside read function
-    async write(doc) {
+    async write(doc, shouldAppend) {
         let startTime = Date.now();
         return new Promise(async (resolve, reject) => {
-            const filename = __dirname + `/${this.database}/${this.collection}.json`;
+            const filename = __dirname + `/${this.database}/${this.collection}.txt`;
 
-            // checking if doc is object or string
-            if (this.isJsonString(doc)) {
-                doc = JSON.parse(doc);
+            // stingifying if doc is object rather than a string
+            if (!this.isJsonString(doc)) {
+                doc = JSON.stringify(doc) + '\n';
             }
 
-            let collectionData = [];
+            let collectionData = '';
 
             //read collection
             try {
                 collectionData = await this.#read();
+                console.log('collectionData', collectionData)
             } catch (error) {
                 if (error.errorCode === 'DB NOT FOUND') {
                     console.error(error.errorReason);
@@ -107,19 +115,25 @@ export default class TODB {
             }
 
             // create stream
-            let writeStream = this.fs.createWriteStream(filename);
+            let writeStream;
 
-            // append doc to collection's array
-            collectionData.push(doc);
-            // 4 is spaces in indentation
-            collectionData = JSON.stringify(collectionData, null, 2);
-            // write collectionData to file
-            writeStream.write(collectionData);
+            // should doc be appended or not at the end of the collection 
+            if (shouldAppend) {
+                writeStream = this.fs.createWriteStream(filename, { flags: 'a' });
+                writeStream.write(doc);
+            } else {
+                writeStream = this.fs.createWriteStream(filename);
+                // append doc to collection's data
+                collectionData += doc;
+                // write collectionData to file
+                writeStream.write(collectionData);
+            }
 
+            // event listeners for write streams
             writeStream.on('finish', () => {
                 let endTime = Date.now();
                 console.log('[WRITE]: Document written in', (endTime - startTime), 'ms.');
-                resolve(collectionData);
+                resolve(`[${collectionData}]`);
             });
             writeStream.on('error', reject);
             // mandatory, else on write stream's `finish` event wont fire off
@@ -127,11 +141,11 @@ export default class TODB {
         })
     }
 
-    async findOne(query){
+    async findOne(query) {
         try {
-            const {default: deepCompare} = await import('./deepCompare.js');
+            const { default: deepCompare } = await import('./deepCompare.js');
             const collectionData = await this.#read();
-            const found = await collectionData.find(doc=>{
+            const found = await collectionData.find(doc => {
                 return deepCompare(doc, query);
             })
             return found;
@@ -141,8 +155,36 @@ export default class TODB {
 
     }
 
-    findAll(){
+    async findAll(query) {
+        try {
+            // check if query is empty
+            // because Object.keys(new Date()).length === 0;
+            // we have to do some additional check
+            const isQueryValid = query // 👈 null and undefined check
+                && Object.keys(query).length === 0
+                && Object.getPrototypeOf(query) === Object.prototype;
 
+            const collectionData = await this.#read();
+
+            if (!isQueryValid) {
+                return collectionData;
+            }
+
+            const { default: deepCompare } = await import('./deepCompare.js');
+            return await collectionData.filter(doc => {
+                return deepCompare(doc, query);
+            });
+        } catch (error) {
+            console.error(error, '[ERROR]: Error while finding all documents.')
+        }
+    }
+
+    async updateOne(query, updateData) {
+        const currentDoc = await this.findOne(query);
+        for (const key in currentDoc) {
+            currentDoc[key] = updateData[key];
+        }
+        return updatedDoc;
     }
 
 

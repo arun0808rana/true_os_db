@@ -11,16 +11,18 @@ const init = async () => {
 
     try {
         // writing to the document
-        const writtenData = await notes.write({ hello: "kitty" });
+        const writtenData = await notes.write({ helloaa: "kitty2aaa" });
         // write function returns the data of the document
         console.log("writtenData", writtenData);
     } catch (error) {
         console.error(error)
     }
-    const document = await notes.findOne({
-        hello4: "kitty4"
-    });
-    console.log('document', document)
+
+    // const document = await notes.findOne({
+    //     hello4: "kitty4"
+    // });
+
+    // console.log('document', document)
 
 }
 
